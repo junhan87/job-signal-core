@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+.eggs/
+.venv/
+venv/
+dist/
+build/
+
+# Type checkers / linters
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# CDK
+cdk.out/
+.cdk.staging/
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Test / Coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+junit*.xml
+test-results/
+
+# Lambda build artifacts
+*.zip
+package/
+
+# Logs
+*.log
+
+# Security — never commit private keys or certificates
+*.pem
+*.key
+*.crt
+*.p12
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Internal working notes — not for public repo
+TODO.md
+ARCHITECTURE_DRAFT.md
