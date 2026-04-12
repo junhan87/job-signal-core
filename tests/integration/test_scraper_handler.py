@@ -41,12 +41,10 @@ def test_handler_stores_new_job_and_deduplicates():
     table = ddb.create_table(
         TableName="test-jobs-table",
         KeySchema=[
-            {"AttributeName": "PK", "KeyType": "HASH"},
-            {"AttributeName": "SK", "KeyType": "RANGE"},
+            {"AttributeName": "job_id", "KeyType": "HASH"},
         ],
         AttributeDefinitions=[
-            {"AttributeName": "PK", "AttributeType": "S"},
-            {"AttributeName": "SK", "AttributeType": "S"},
+            {"AttributeName": "job_id", "AttributeType": "S"},
         ],
         BillingMode="PAY_PER_REQUEST",
     )
@@ -66,12 +64,14 @@ def test_handler_stores_new_job_and_deduplicates():
         salary_max=12000,
     )
 
-    with patch("infrastructure.lambda.scraper_handler.MyCareersFutureScraper") as MockScraper:
-        mock_instance = MagicMock()
-        mock_instance.fetch.return_value = iter([fake_listing])
-        MockScraper.return_value = mock_instance
+    MockScraper = MagicMock()
+    mock_instance = MagicMock()
+    mock_instance.fetch.return_value = iter([fake_listing])
+    MockScraper.return_value = mock_instance
 
-        from infrastructure.lambda import scraper_handler
+    # Patch the SCRAPERS dict so handler uses our mock
+    with patch.dict("infrastructure.handlers.scraper_handler.SCRAPERS", {"mcf": MockScraper}):
+        from infrastructure.handlers import scraper_handler
 
         # First run — should store
         result1 = scraper_handler.handler({}, None)

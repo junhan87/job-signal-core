@@ -33,7 +33,7 @@ def _build_session() -> requests.Session:
     )
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("https://", adapter)
-    session.headers.update({"User-Agent": "JobScout/1.0 (personal research tool)"})
+    session.headers.update({"User-Agent": "JobSignal/1.0 (personal research tool)"})
     return session
 
 

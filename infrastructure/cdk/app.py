@@ -7,7 +7,7 @@ app = cdk.App()
 
 ScraperStack(
     app,
-    "JobScoutScraperStack",
+    "JobSignalScraperStack",
     env=cdk.Environment(region="ap-southeast-1"),
 )
 

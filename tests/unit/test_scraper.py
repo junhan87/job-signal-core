@@ -46,12 +46,10 @@ def dynamo_table(aws_credentials):
         table = ddb.create_table(
             TableName="test-jobs-table",
             KeySchema=[
-                {"AttributeName": "PK", "KeyType": "HASH"},
-                {"AttributeName": "SK", "KeyType": "RANGE"},
+                {"AttributeName": "job_id", "KeyType": "HASH"},
             ],
             AttributeDefinitions=[
-                {"AttributeName": "PK", "AttributeType": "S"},
-                {"AttributeName": "SK", "AttributeType": "S"},
+                {"AttributeName": "job_id", "AttributeType": "S"},
             ],
             BillingMode="PAY_PER_REQUEST",
         )

@@ -1,5 +1,5 @@
 {
-  "app": "python infrastructure/cdk/app.py",
+  "app": "python -m infrastructure.cdk.app",
   "context": {
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,

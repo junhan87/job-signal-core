@@ -54,7 +54,7 @@ Phase 1 - Single User | A working system that scrapes MyCareersFuture daily, scr
 ```mermaid
 flowchart TD
     subgraph Trigger["⏰ Schedule Layer"]
-        EB["EventBridge<br>Daily cron — 8 am UTC"]
+        EB["EventBridge<br>Daily cron — 10 am UTC"]
     end
 
     subgraph Scraper["🔍 Scraper Layer (Public Repo)"]
@@ -119,7 +119,7 @@ flowchart TD
 
 ### 2.2 End-to-End Flow (Plain English)
 
-1. **EventBridge** fires a cron at 8 am UTC every day
+1. **EventBridge** fires a cron at 10 am UTC every day
 2. **Scraper Lambda** calls the MyCareersFuture public API, extracts job listings, deduplicates against DynamoDB, and stores raw JSON to S3
 3. **AI Scorer Lambda** picks up new jobs from S3, parses each job description via Bedrock (result cached — called once per unique JD across all users), and runs every listing through the 7-factor Python scoring engine
 4. Market adjustments (recency, company tier, FCF listing status) are applied by Python
@@ -134,7 +134,7 @@ flowchart TD
 | Service | Role | Cost (personal use) |
 |---|---|---|
 | **Lambda** | Serverless compute — scraper, scorer, digest | Free tier |
-| **EventBridge** | Daily cron trigger (8 am UTC) | Free |
+| **EventBridge** | Daily cron trigger (10 am UTC) | Free |
 | **S3** | Raw job JSON + resume PDF storage | ~$0.01/month |
 | **DynamoDB** | Job dedup, match results, resume + JD cache | Free tier |
 | **SES** | Daily HTML email digest | Free tier |

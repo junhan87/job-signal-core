@@ -15,7 +15,13 @@ from datetime import datetime, timezone
 import boto3
 from botocore.exceptions import ClientError
 
+from scraper.base_scraper import BaseScraper
 from scraper.mycareersfuture import MyCareersFutureScraper
+
+# --- Scraper registry (add new scrapers here) ---
+SCRAPERS: dict[str, type[BaseScraper]] = {
+    "mcf": MyCareersFutureScraper,
+}
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -41,12 +47,16 @@ jobs_table = dynamodb.Table(JOBS_TABLE)
 
 def handler(event: dict, context) -> dict:
     """Lambda entry point."""
+    platform: str = event.get("platform", "mcf")
     search_terms: list[str] = event.get("search_terms", DEFAULT_SEARCH_TERMS)
     run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    logger.info("Scraper started | date=%s | terms=%s", run_date, search_terms)
+    if platform not in SCRAPERS:
+        raise ValueError(f"Unknown platform: {platform!r}. Available: {list(SCRAPERS)}")
 
-    scraper = MyCareersFutureScraper()
+    logger.info("Scraper started | platform=%s | date=%s | terms=%s", platform, run_date, search_terms)
+
+    scraper = SCRAPERS[platform]()
     new_count = 0
     dup_count = 0
     error_count = 0
@@ -81,15 +91,15 @@ def handler(event: dict, context) -> dict:
 def _is_duplicate(job_id: str) -> bool:
     """Return True if job_id already exists in DynamoDB."""
     response = jobs_table.get_item(
-        Key={"PK": f"JOB#{job_id}", "SK": "METADATA"},
-        ProjectionExpression="PK",
+        Key={"job_id": job_id},
+        ProjectionExpression="job_id",
     )
     return "Item" in response
 
 
 def _store_to_s3(listing, run_date: str) -> None:
     """Write raw job JSON to S3 under a date-partitioned prefix."""
-    key = f"mcf/{run_date}/{listing.job_id}.json"
+    key = f"raw/{listing.source}/{run_date}/{listing.job_id}.json"
     s3.put_object(
         Bucket=JOBS_BUCKET,
         Key=key,
@@ -102,8 +112,7 @@ def _record_in_dynamodb(listing) -> None:
     """Write a lightweight index record to DynamoDB for dedup and querying."""
     jobs_table.put_item(
         Item={
-            "PK": f"JOB#{listing.job_id}",
-            "SK": "METADATA",
+            "job_id": listing.job_id,
             "title": listing.title,
             "company": listing.company,
             "url": listing.url,
