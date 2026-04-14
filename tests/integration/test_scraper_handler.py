@@ -66,6 +66,7 @@ def test_handler_stores_new_job_and_deduplicates():
 
     MockScraper = MagicMock()
     mock_instance = MagicMock()
+    mock_instance.source = "mcf"
     mock_instance.fetch.return_value = iter([fake_listing])
     MockScraper.return_value = mock_instance
 
@@ -84,11 +85,28 @@ def test_handler_stores_new_job_and_deduplicates():
         assert result2["new"] == 0
         assert result2["duplicates"] == 1
 
-    # Verify S3 object was created
+    # Verify S3 objects: 1 raw job + 1 batch manifest
     objects = s3.list_objects_v2(Bucket="test-jobs-bucket")
-    assert objects["KeyCount"] == 1
-    body = s3.get_object(
-        Bucket="test-jobs-bucket", Key=objects["Contents"][0]["Key"]
-    )["Body"].read()
+    assert objects["KeyCount"] == 2
+    keys = sorted(obj["Key"] for obj in objects["Contents"])
+
+    raw_key = [k for k in keys if k.startswith("raw/")][0]
+    body = s3.get_object(Bucket="test-jobs-bucket", Key=raw_key)["Body"].read()
     data = json.loads(body)
     assert data["job_id"] == "test-uuid-001"
+
+    # Verify batch manifest structure
+    manifest_key = [k for k in keys if k.startswith("batches/")][0]
+    manifest = json.loads(
+        s3.get_object(Bucket="test-jobs-bucket", Key=manifest_key)["Body"].read()
+    )
+    assert manifest["source"] == "mcf"
+    assert manifest["job_ids"] == ["test-uuid-001"]
+    assert manifest["job_count"] == 1
+    assert "batch_id" in manifest
+    assert manifest["batch_id"].startswith("mcf-")
+    assert "scraped_at" in manifest
+
+    # Verify batch_id is returned in handler response
+    assert result1["batch_id"] is not None
+    assert result1["batch_id"] == manifest["batch_id"]

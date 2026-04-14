@@ -6,10 +6,10 @@ Writes raw JSON to S3 and deduplicates via DynamoDB.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
 
 import boto3
@@ -60,6 +60,7 @@ def handler(event: dict, context) -> dict:
     new_count = 0
     dup_count = 0
     error_count = 0
+    new_job_ids: list[str] = []
 
     for listing in scraper.fetch(search_terms):
         try:
@@ -69,6 +70,7 @@ def handler(event: dict, context) -> dict:
 
             _store_to_s3(listing, run_date)
             _record_in_dynamodb(listing)
+            new_job_ids.append(listing.job_id)
             new_count += 1
 
         except ClientError as exc:
@@ -78,11 +80,21 @@ def handler(event: dict, context) -> dict:
             logger.error("Unexpected error for job %s: %s", listing.job_id, exc)
             error_count += 1
 
+    # --- Manifest is the commit point: written only after all jobs are persisted ---
+    batch_id: str | None = None
+    if new_job_ids:
+        batch_id = _write_batch_manifest(
+            source=scraper.source,
+            run_date=run_date,
+            job_ids=new_job_ids,
+        )
+
     summary = {
         "date": run_date,
         "new": new_count,
         "duplicates": dup_count,
         "errors": error_count,
+        "batch_id": batch_id,
     }
     logger.info("Scraper complete | %s", summary)
     return summary
@@ -127,6 +139,32 @@ def _record_in_dynamodb(listing) -> None:
             "ttl": _ttl_epoch(days=60),
         }
     )
+
+
+def _write_batch_manifest(source: str, run_date: str, job_ids: list[str]) -> str:
+    """Write a batch manifest to S3 as the final 'commit point' for a scrape run.
+
+    The scorer Lambda triggers on this object. All per-job S3 files and DynamoDB
+    records must already be written before this function is called.
+    """
+    suffix = uuid.uuid4().hex[:6]
+    batch_id = f"{source}-{run_date}-{suffix}"
+    manifest = {
+        "batch_id": batch_id,
+        "source": source,
+        "job_ids": job_ids,
+        "job_count": len(job_ids),
+        "scraped_at": datetime.now(timezone.utc).isoformat(),
+    }
+    key = f"batches/{run_date}/{batch_id}.json"
+    s3.put_object(
+        Bucket=JOBS_BUCKET,
+        Key=key,
+        Body=json.dumps(manifest),
+        ContentType="application/json",
+    )
+    logger.info("Batch manifest written | key=%s | jobs=%d", key, len(job_ids))
+    return batch_id
 
 
 def _ttl_epoch(days: int) -> int:

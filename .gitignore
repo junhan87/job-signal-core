@@ -8,6 +8,7 @@ __pycache__/
 venv/
 dist/
 build/
+.pytest_cache/
 
 # Type checkers / linters
 .mypy_cache/
@@ -17,6 +18,7 @@ build/
 # CDK
 cdk.out/
 .cdk.staging/
+layer/python/
 
 # Environment
 .env
@@ -41,6 +43,7 @@ package/
 
 # Logs
 *.log
+out.json
 
 # Security — never commit private keys or certificates
 *.pem

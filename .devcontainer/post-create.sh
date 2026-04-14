@@ -5,6 +5,12 @@ echo "==> Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt -r requirements-dev.txt
 
+echo "==> Building Lambda layer..."
+if [ ! -d "layer/python/requests" ]; then
+    mkdir -p layer/python
+    pip install requests -t layer/python/ --quiet
+fi
+
 echo "==> Installing AWS CDK CLI..."
 npm install -g aws-cdk
 

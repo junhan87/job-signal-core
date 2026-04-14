@@ -116,14 +116,31 @@ def _parse_listing(item: dict) -> JobListing | None:
         return None
 
 
+_EMPLOYMENT_TYPE_MAP: dict[str, str] = {
+    "permanent": "FULL_TIME",
+    "full time": "FULL_TIME",
+    "part time": "PART_TIME",
+    "contract": "CONTRACT",
+    "temporary": "CONTRACT",
+    "flexi-work": "PART_TIME",
+}
+
+
 def _map_employment_type(types: list[dict]) -> str | None:
     if not types:
         return None
-    return types[0].get("employmentType", {}).get("employmentType")
+    raw = types[0].get("employmentType")
+    if isinstance(raw, dict):
+        raw = raw.get("employmentType")
+    if not raw:
+        return None
+    return _EMPLOYMENT_TYPE_MAP.get(raw.lower().strip(), raw.upper())
 
 
 def _extract_location(item: dict) -> str | None:
-    addresses = item.get("positionLocations", [])
-    if addresses:
-        return addresses[0].get("location", {}).get("district")
+    address = item.get("address", {})
+    if isinstance(address, dict):
+        districts = address.get("districts", [])
+        if districts:
+            return districts[0].get("location")
     return None

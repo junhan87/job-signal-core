@@ -78,18 +78,29 @@ class ScraperStack(cdk.Stack):
             encryption=sqs.QueueEncryption.SQS_MANAGED,
         )
 
+        # ── Lambda Layer: runtime dependencies ───────────────────────────────
+        deps_layer = lambda_.LayerVersion(
+            self,
+            "ScraperDepsLayer",
+            code=lambda_.Code.from_asset("layer"),
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_12],
+            description="Runtime dependencies (requests)",
+        )
+
         # ── Lambda: scraper ──────────────────────────────────────────────────
         scraper_fn = lambda_.Function(
             self,
             "ScraperFunction",
             function_name="jobsignal-scraper",
             runtime=lambda_.Runtime.PYTHON_3_12,
+            layers=[deps_layer], 
             handler="infrastructure.handlers.scraper_handler.handler",
             code=lambda_.Code.from_asset(
                 ".",
                 exclude=[
                     "cdk.out", ".venv", ".git", "tests",
                     "__pycache__", "*.pyc", "node_modules",
+                    "layer",
                 ],
             ),
             timeout=Duration.minutes(10),
