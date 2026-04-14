@@ -50,6 +50,11 @@ jobs:
       - name: Install CDK CLI
         run: npm install -g aws-cdk
 
+      - name: Build Lambda layer
+        run: |
+          mkdir -p layer/python
+          pip install -r requirements-lambda.txt -t layer/python
+
       - name: CDK Synth
         run: cdk synth
         env:

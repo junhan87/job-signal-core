@@ -25,6 +25,7 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_cloudwatch_actions as cw_actions,
     aws_sns as sns,
+    aws_ssm as ssm,
 )
 from constructs import Construct
 
@@ -65,7 +66,9 @@ class ScraperStack(cdk.Stack):
             partition_key=dynamodb.Attribute(name="job_id", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             time_to_live_attribute="ttl",
-            point_in_time_recovery=True,
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=True,
+            ),
             removal_policy=RemovalPolicy.RETAIN,
         )
 
@@ -143,6 +146,34 @@ class ScraperStack(cdk.Stack):
         )
         error_alarm.add_alarm_action(cw_actions.SnsAction(ops_topic))
 
+        # --- SSM Parameter Store: cross-stack resource discovery ---
+        # The saas repo reads these at CDK synth time to find shared resources.
+        # Namespace: /jobsignal/{resource-type}/{name}
+
+        ssm.StringParameter(self, "RawBucketNameParam",
+            parameter_name="/jobsignal/s3/raw-bucket-name",
+            string_value=jobs_bucket.bucket_name,
+        )
+
+        ssm.StringParameter(self, "RawBucketArnParam",
+            parameter_name="/jobsignal/s3/raw-bucket-arn",
+            string_value=jobs_bucket.bucket_arn,
+        )
+
+        ssm.StringParameter(self, "JobsTableNameParam",
+            parameter_name="/jobsignal/dynamodb/jobs-table-name",
+            string_value=jobs_table.table_name,
+        )
+
+        ssm.StringParameter(self, "JobsTableArnParam",
+            parameter_name="/jobsignal/dynamodb/jobs-table-arn",
+            string_value=jobs_table.table_arn,
+        )
+
+        ssm.StringParameter(self, "OpsAlertsTopicArnParam",
+            parameter_name="/jobsignal/sns/ops-alerts-topic-arn",
+            string_value=ops_topic.topic_arn,
+        )
         # ── Outputs ──────────────────────────────────────────────────────────
         cdk.CfnOutput(self, "JobsBucketName", value=jobs_bucket.bucket_name)
         cdk.CfnOutput(self, "JobsTableName", value=jobs_table.table_name)
