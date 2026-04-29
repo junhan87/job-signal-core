@@ -1,6 +1,11 @@
+![AWS CDK](https://img.shields.io/badge/AWS_CDK-Python-orange)
+![Bedrock](https://img.shields.io/badge/AWS_Bedrock-Claude_Haiku-blue)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions_OIDC-green)
+![Phase](https://img.shields.io/badge/Phase-1_Deployed-brightgreen)
+
 # Job Signal Core
 
-> AI-powered job screening pipeline that automatically scores job postings against your resume using AWS Bedrock + Claude — and delivers only your top matches daily.
+> AI-powered job screening pipeline that cuts daily job screening from 30 minutes to zero. Scrapes MCF daily, scores every listing against your resume using AWS Bedrock + Claude, and delivers only your top 5 matches.
 
 ---
 
@@ -10,74 +15,64 @@ Platform job alerts match on job title keywords only — not on actual job descr
 
 ---
 
+## What This Demonstrates
+- Serverless AWS architecture (Lambda, EventBridge, S3, DynamoDB, SES, Bedrock)
+- Cost-conscious design: 1,000× Bedrock call reduction via caching
+- Infrastructure as Code with AWS CDK
+- Secure CI/CD with GitHub Actions + OIDC (zero static credentials)
+- AI/LLM integration with prompt engineering for structured output
+
+
+---
+
 ## Architecture
 
 ```mermaid
-flowchart TD
-    subgraph Trigger["⏰ Schedule Layer"]
-        EB["EventBridge<br>Daily cron — 10 am UTC"]
-    end
-
-    subgraph Scraper["🔍 Scraper Layer (Public Repo)"]
-        LS["Lambda: Scraper"]
-        MCF["MyCareersFuture<br>Public API"]
-        JS["Jobstreet<br>HTML Scraper (Phase 2)"]
-        IN["Indeed<br>Scraper (Phase 2)"]
-    end
-
-    subgraph Storage["🗄️ Storage Layer"]
-        S3R["S3: Raw Job Data<br>jobsignal-raw/"]
-        S3P["S3: Resume PDFs<br>jobsignal-resumes/"]
-        DDB["DynamoDB<br>Jobs · Matches · Resume Cache"]
-    end
-
-    subgraph Scorer["🤖 AI Scorer Layer (Private Repo)"]
-        LA["Lambda: AI Scorer"]
-        RP["Resume Parser<br>Textract → Bedrock → JSON"]
-        JP["JD Parser<br>Bedrock Claude Haiku<br>(cached — shared across users)"]
-        SE["Scoring Engine<br>Python — 8-factor weighted score"]
-        MA["Market Adjustment<br>Python — recency, salary, demand signal"]
-        GA["Gap Analyser<br>Python identifies · Claude articulates"]
-        AR["Action Recommender<br>Python threshold logic"]
-        SG["Summary Generator<br>Claude Haiku (Phase 1) · Sonnet (Phase 2+)"]
-    end
-
-    subgraph LLM["☁️ AWS Bedrock (ap-southeast-1)"]
-        CH["Claude Haiku 4.5<br>All Phase 1 tasks"]
-        CS["Claude Sonnet 4.6<br>Enrichment (Phase 2+)"]
-    end
-
-    subgraph Notify["📬 Notification Layer"]
-        SES["Amazon SES<br>HTML email digest"]
-        USER["📥 Daily Email<br>Top 5 matches"]
-    end
-
-    EB -->|triggers| LS
-    LS --> MCF & JS & IN
-    MCF & JS & IN -->|raw JSON| S3R
-    S3R -->|triggers| LA
-    LA --> RP & JP
-    RP -->|Textract| S3P
-    JP -->|structured JD| DDB
-    RP -->|structured profile| DDB
-    DDB -->|cached data| SE
-    SE --> MA --> GA --> AR --> SG
-    LA -->|scored results| DDB
-    CH -.->|parse| JP & RP
-    CH -.->|enrich| GA & SG
-    CS -.->|enrich Phase 2+| GA & SG
-    LA -->|sends| SES
-    SES --> USER
-
-    style Trigger fill:#f0f4ff,stroke:#3b82f6,color:#000000
-    style Scraper fill:#f0fff4,stroke:#22c55e,color:#000000
-    style Storage fill:#fffbeb,stroke:#f59e0b,color:#000000
-    style Scorer fill:#fdf4ff,stroke:#a855f7,color:#000000
-    style LLM fill:#fff1f2,stroke:#f43f5e,color:#000000
-    style Notify fill:#f0f9ff,stroke:#0ea5e9,color:#000000
+flowchart LR
+    EB["EventBridge<br>(Daily cron)"] --> LS["Lambda: Scraper"]
+    LS --> MCF["MyCareersFuture"]
+    LS --> JS["Jobstreet"]
+    LS --> IN["Indeed"]
+    MCF & JS & IN --> S3R["S3: Raw Job Data"]
+    S3R --> LA["Lambda: AI Scorer"]
+    LA --> DDB["DynamoDB (Jobs, Matches, Resume Cache)"]
+    LA --> S3P["S3: Resume PDFs"]
+    LA --> CH["Claude Haiku (Bedrock)"]
+    LA --> SES["Amazon SES"]
+    SES --> USER["Daily Email: Top 5 matches"]
+    style EB fill:#f0f4ff,stroke:#3b82f6,color:#000000
+    style LS fill:#f0fff4,stroke:#22c55e,color:#000000
+    style MCF fill:#f0fff4,stroke:#22c55e,color:#000000
+    style JS fill:#f0fff4,stroke:#22c55e,color:#000000
+    style IN fill:#f0fff4,stroke:#22c55e,color:#000000
+    style S3R fill:#fffbeb,stroke:#f59e0b,color:#000000
+    style LA fill:#fdf4ff,stroke:#a855f7,color:#000000
+    style DDB fill:#fffbeb,stroke:#f59e0b,color:#000000
+    style S3P fill:#fffbeb,stroke:#f59e0b,color:#000000
+    style CH fill:#fff1f2,stroke:#f43f5e,color:#000000
+    style SES fill:#f0f9ff,stroke:#0ea5e9,color:#000000
+    style USER fill:#f0f9ff,stroke:#0ea5e9,color:#000000
 ```
 
 **Data flow:** EventBridge fires once daily → Scraper Lambda pulls listings from MCF (Jobstreet/Indeed in Phase 2) → raw JSON lands in S3 → S3 event triggers the AI scorer → Claude Haiku parses each JD (result cached in DynamoDB, shared across users) → salary pre-filter short-circuits ineligible jobs → 8-factor Python scoring engine runs → Claude Haiku writes the gap analysis and summary (Phase 1; Sonnet in Phase 2+) → top 5 matches delivered as an HTML email digest by the scorer Lambda.
+
+→ Full architecture with AI scoring pipeline internals: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+---
+
+## Open Core Model
+
+This project uses the same strategy as Grafana, GitLab, and MongoDB:
+
+| Repo | Visibility | Contents |
+|---|---|---|
+| job-signal-core (this repo) | Public — AGPL v3 | Scrapers, CDK infra, CLI |
+| job-signal-saas | Private — Proprietary | AI scorer, multi-tenant API, billing |
+
+AGPL v3 permits free self-hosting but requires anyone running a 
+hosted service to open-source their modifications — protecting 
+commercial IP while enabling open portfolio visibility.
+
 
 ---
 
