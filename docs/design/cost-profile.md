@@ -27,6 +27,6 @@
 | DynamoDB | ~$5 | On-demand pricing |
 | Lambda | ~$2 | Beyond free tier |
 | SES | ~$3 | ~30K emails/month |
-| **Total** | **~$221/month** | At SGD 15/user Pro plan = SGD 15K MRR = **1.4% of revenue** |
+| **Total** | **~$221/month** | Infrastructure costs remain < 2% of projected SaaS revenue at this tier |
 
 The JD parsing cache is the key cost lever. Without it, 1,000 users scoring against the same 50 daily jobs would generate 50,000 Bedrock calls/day instead of 50.

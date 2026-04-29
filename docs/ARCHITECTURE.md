@@ -10,22 +10,7 @@ Platform job alerts match on job title keywords only — not on the actual job d
 
 ## The Solution
 
-JobSignal scrapes job platforms daily, uses AI to screen each listing against a structured resume profile, scores every role across seven weighted factors, and delivers only the top matches — with a fit score, plain-English summary, and actionable gap analysis.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Compute | AWS Lambda (serverless) |
-| Scheduling | Amazon EventBridge (daily cron) |
-| Storage | Amazon S3 + DynamoDB |
-| AI / LLM | AWS Bedrock — Claude Haiku 4.5 + Sonnet 4.6 |
-| Notifications | Amazon SES (email digest) |
-| Infrastructure as Code | AWS CDK (Python) |
-| CI/CD | GitHub Actions + OIDC (no static credentials) |
-| Language | Python 3.12 |
+JobSignal scrapes job platforms daily, uses AI to screen each listing against a structured resume profile, scores every role across eight weighted factors, and delivers only the top matches — with a fit score, plain-English summary, and actionable gap analysis.
 
 ---
 
@@ -47,27 +32,25 @@ flowchart TD
     subgraph Storage["🗄️ Storage Layer"]
         S3R["S3: Raw Job Data<br>jobsignal-raw/"]
         S3P["S3: Resume PDFs<br>jobsignal-resumes/"]
-        DDB["DynamoDB<br>Jobs · Matches · Resume Cache"]
+        DDB["DynamoDB<br>Jobs · Matches · Resume Cache · JD Cache"]
     end
 
     subgraph Scorer["🤖 AI Scorer Layer (Private Repo)"]
         LA["Lambda: AI Scorer"]
         RP["Resume Parser<br>Textract → Bedrock → JSON"]
         JP["JD Parser<br>Bedrock Claude Haiku<br>(cached — shared across users)"]
-        SE["Scoring Engine<br>Python — 7-factor weighted score"]
-        MA["Market Adjustment<br>Python — recency, company tier, FCF"]
-        GA["Gap Analyser<br>Python identifies · Claude articulates"]
+        SE["Scoring Engine<br>Python — 8-factor weighted score"]
+        MA["Market Adjustment<br>Python — recency, company tier, salary"]
         AR["Action Recommender<br>Python threshold logic"]
-        SG["Summary Generator<br>Claude Sonnet"]
+        EN["Enricher<br>Bedrock — gap analysis & match summary"]
     end
 
     subgraph LLM["☁️ AWS Bedrock (ap-southeast-1)"]
-        CH["Claude Haiku 4.5<br>Parsing tasks"]
-        CS["Claude Sonnet 4.6<br>Writing tasks"]
+        CH["Claude Haiku 4.5<br>All AI tasks (Phase 1)"]
+        CS["Claude Sonnet 4.6<br>Enrichment (Phase 2)"]
     end
 
     subgraph Notify["📬 Notification Layer"]
-        LB["Lambda: Digest Builder"]
         SES["Amazon SES<br>HTML email digest"]
         USER["📥 Daily Email<br>Top 5 matches"]
     end
@@ -75,18 +58,17 @@ flowchart TD
     EB -->|triggers| LS
     LS --> MCF & JS & IN
     MCF & JS & IN -->|raw JSON| S3R
-    S3R -->|triggers| LA
+    S3R -->|batch manifest triggers| LA
     LA --> RP & JP
     RP -->|Textract| S3P
     JP -->|structured JD| DDB
     RP -->|structured profile| DDB
     DDB -->|cached data| SE
-    SE --> MA --> GA --> AR --> SG
+    SE --> MA --> AR --> EN
     LA -->|scored results| DDB
-    CH -.->|parse| JP & RP
-    CS -.->|write| GA & SG
-    DDB -->|top matches| LB
-    LB -->|sends| SES
+    CH -.->|parse & enrich| JP & RP & EN
+    CS -.->|enrich Phase 2| EN
+    LA -->|sends digest| SES
     SES --> USER
 
     style Trigger fill:#f0f4ff,stroke:#3b82f6,color:#000000
@@ -101,11 +83,11 @@ flowchart TD
 
 1. **EventBridge** fires a cron at 10 am UTC every day
 2. **Scraper Lambda** calls the MyCareersFuture public API, extracts job listings, deduplicates against DynamoDB, and stores raw JSON to S3
-3. **AI Scorer Lambda** picks up new jobs from S3, parses each job description via Bedrock (result cached — called once per unique JD across all users), and runs every listing through the 7-factor Python scoring engine
+3. **AI Scorer Lambda** is triggered by the batch manifest, parses each job description via Bedrock (result cached — called once per unique JD across all users), and runs every listing through the 8-factor Python scoring engine
 4. Market adjustments (recency, company tier, FCF listing status) are applied by Python
-5. For jobs scoring ≥ 5.0, Bedrock articulates gap analysis and generates a human-readable match summary
-6. Results are written to DynamoDB with a TTL of 90 days
-7. **Digest Lambda** queries the top 5 matches and sends a formatted HTML email via SES
+5. For jobs scoring ≥ 5.0, Bedrock generates a gap analysis and human-readable match summary in a single call
+6. Results are written to DynamoDB
+7. The scorer Lambda builds and sends a formatted HTML email digest via SES with the top 5 matches
 
 ---
 
@@ -125,7 +107,7 @@ The AGPL v3 licence permits free self-hosting and forks, but requires anyone run
 ```
 Public repo (job-signal-core)         Private repo (job-signal-saas)
 ─────────────────────────────         ──────────────────────────────
-MyCareersFuture scraper               AI scoring engine (7 factors)
+MyCareersFuture scraper               AI scoring engine (8 factors)
 Jobstreet scraper                     Prompt templates
 CDK infrastructure stacks             SaaS API (API Gateway + Lambda)
 Lambda handler entry points           Multi-tenant DynamoDB design

@@ -22,10 +22,18 @@ All CI/CD workflows use AWS OIDC federation. No long-lived AWS credentials are s
 
 ---
 
+## SSM Parameter Store for Cross-Stack Discovery
+
+The `job-signal-core` stack writes SSM parameters at deploy time for every resource the `job-signal-saas` stack consumes (raw S3 bucket, jobs DynamoDB table, ops-alerts SNS topic). The saas stack reads these at CDK synth time.
+
+This keeps the two stacks independently deployable — neither holds a hard CDK export dependency on the other. CDK `Fn.importValue` was rejected because it creates a removal/update coupling between stacks that would require coordinated deployments.
+
+---
+
 ## Phased Model Strategy
 
 | Phase | Users | Models | Cost |
 |---|---|---|---|
-| Phase 1 | 0–100 | Claude Haiku 4.5 for all tasks | ~$1.50/month |
-| Phase 2 | 100–1,000 | Haiku for parsing, Sonnet for writing | ~$211/month per 1K users |
-| Phase 3 | 1,000+ | Llama 4 via Bedrock for parsing, Sonnet for writing | Evaluate SageMaker self-host |
+| Phase 1 | 0–1 | Claude Haiku 4.5 for all tasks | ~$1.50/month |
+| Phase 2 | 2 –100 | Haiku for parsing, Sonnet for writing | ~$21/month per 100 users |
+| Phase 3 | 100+ | Llama 4 via Bedrock for parsing, Sonnet for writing | Evaluate SageMaker self-host |

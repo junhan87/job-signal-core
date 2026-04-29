@@ -20,20 +20,19 @@ flowchart LR
     B & D --> E
 
     subgraph Python["Pure Python — No LLM"]
-        E["Scoring Engine<br>7-factor weighted score<br>0.0 – 10.0"]
-        F["Market Adjustment<br>Recency · FCF listing · Company tier"]
+        E["Scoring Engine<br>8-factor weighted score<br>0.0 – 10.0"]
+        F["Market Adjustment<br>Salary fit · Freshness · Demand signal"]
         G["Action Recommender<br>Apply Now / Consider / Skip"]
     end
 
     E --> F --> G
 
-    subgraph Bedrock["AWS Bedrock — Claude Sonnet"]
-        H["Gap Analyser<br>Articulates what is missing<br>and how to address it"]
-        I["Summary Generator<br>Plain-English match paragraph"]
+    subgraph Bedrock["AWS Bedrock — Claude Haiku (Phase 1)"]
+        H["Enrich<br>Gap analysis + summary<br>Single call per qualifying job"]
     end
 
-    G -->|score ≥ 5.0| H & I
-    H & I --> J["📥 DynamoDB<br>Match Record + TTL"]
+    G -->|score ≥ 5.0| H
+    H --> J["📥 DynamoDB<br>Match Record + TTL"]
     J --> K["📧 Email Digest<br>Top 5 matches"]
 ```
 
@@ -41,7 +40,7 @@ flowchart LR
 
 ## Scoring Factors
 
-The scoring engine evaluates seven weighted factors. Specific weights and sub-criteria are proprietary and defined in the private `job-signal-saas` repository.
+The scoring engine evaluates eight weighted factors. Specific weights and sub-criteria are proprietary and defined in the private `job-signal-saas` repository.
 
 | Factor |
 |---|
@@ -49,7 +48,7 @@ The scoring engine evaluates seven weighted factors. Specific weights and sub-cr
 | Seniority Alignment |
 | Work Arrangement |
 | Citizenship Eligibility |
-| + 3 additional proprietary factors |
+| + 4 additional proprietary factors |
 
 ---
 

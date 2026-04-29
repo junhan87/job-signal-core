@@ -17,6 +17,10 @@
 | **Textract** | Resume PDF text extraction (one-time per upload) | Pay-per-page |
 | **Secrets Manager** | Third-party API key storage | ~$0.80/month |
 | **CloudWatch** | Structured logging, alarms, dashboards | Free tier |
+| **X-Ray** | Distributed tracing — scorer Lambda, DynamoDB, S3, Bedrock | Free tier |
+| **SQS** | Dead-letter queue for failed scorer jobs | Free tier |
+| **SNS** | Ops alert fan-out — CloudWatch alarms → email | Free tier |
+| **SSM Parameter Store** | Cross-stack resource references (core → saas at synth time) | Free tier |
 | **CDK** | Infrastructure as Code — all AWS resources defined in Python | Free |
 | **API Gateway** | REST API for SaaS layer (Phase 2+) | Free: 1M calls/month |
 | **Cognito** | User authentication (Phase 2+) | Free: 50K MAU |

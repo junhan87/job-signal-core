@@ -8,25 +8,28 @@
 
 ```
 jobsignal-raw/
-└── mcf/
+├── mcf/
+│   └── 2026-04-10/
+│       └── jobs_batch_01.json
+└── batches/
     └── 2026-04-10/
-        └── jobs_batch_01.json
+        └── {batch_id}.json        ← scorer trigger
 
 jobsignal-resumes/
 └── {user_id}/
-    └── resume_v3.pdf
+    └── resume.pdf
 ```
 
 ---
 
 ## DynamoDB Table Design
 
-| Table | Partition Key | Sort Key | TTL | Purpose |
+| Table | Owner | Key Fields | TTL | Purpose |
 |---|---|---|---|---|
-| `jobs` | `job_id` | — | 60 days | Raw job metadata + dedup |
-| `matches` | `USER#{user_id}` | `JOB#{job_id}` | 90 days | Scored results per user |
-| `resume_cache` | `USER#{user_id}` | — | None | Structured resume profile |
-| `jd_cache` | `job_id` | — | 60 days | Parsed JD — shared across users |
+| `jobsignal-jobs` | `job-signal-core` | `job_id` | 60 days | Raw job metadata + dedup |
+| `jobsignal-matches` | `job-signal-saas` | `user_id` + `job_id` | 90 days | Scored results per user |
+| `jobsignal-resume-cache` | `job-signal-saas` | `user_id` | None | Structured resume profile |
+| `jobsignal-jd-cache` | `job-signal-saas` | `job_id` | 60 days | Parsed JD — shared across users |
 
 All TTL values are set at write time. DynamoDB handles expiry automatically — no maintenance Lambda required.
 
