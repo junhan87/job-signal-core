@@ -35,9 +35,11 @@ AWS_REGION = os.environ.get("AWS_REGION", "ap-southeast-1")
 DEFAULT_SEARCH_TERMS = [
     "cloud architect",
     "solutions architect",
-    "cloud engineer",
-    "devops engineer",
-    "platform engineer",
+    "iot architect",
+    "edge computing architect",
+    "technical architect",
+    "presales architect",
+    "partner solutions architect"
 ]
 
 s3 = boto3.client("s3", region_name=AWS_REGION)
