@@ -121,14 +121,23 @@ class ScraperStack(cdk.Stack):
         jobs_table.grant_read_write_data(scraper_fn)
 
         # ── EventBridge: daily cron 10:00 UTC ────────────────────────────────
+        # One rule fires all platforms concurrently. Each target passes a
+        # different constant JSON payload so the handler knows which platform
+        # to scrape. To add a new platform, append another add_target() call.
         rule = events.Rule(
             self,
             "DailyScraperRule",
             rule_name="jobsignal-daily-scraper",
             schedule=events.Schedule.cron(minute="0", hour="10"),
-            description="Trigger JobSignal scraper daily at 10:00 UTC",
+            description="Trigger JobSignal scraper for all platforms daily at 10:00 UTC",
         )
-        rule.add_target(targets.LambdaFunction(scraper_fn))
+        for platform_key in ["mcf", "jobstreet"]:
+            rule.add_target(
+                targets.LambdaFunction(
+                    scraper_fn,
+                    event=events.RuleTargetInput.from_object({"platform": platform_key}),
+                )
+            )
 
         # ── CloudWatch: alarm on Lambda errors ───────────────────────────────
         ops_topic = sns.Topic(self, "OpsAlertsTopic", topic_name="jobsignal-ops-alerts")

@@ -110,3 +110,64 @@ def test_handler_stores_new_job_and_deduplicates():
     # Verify batch_id is returned in handler response
     assert result1["batch_id"] is not None
     assert result1["batch_id"] == manifest["batch_id"]
+
+
+@mock_aws
+def test_handler_routes_jobstreet_platform():
+    """EventBridge passes {"platform": "jobstreet"} — handler must route to JobStreetScraper."""
+    s3 = boto3.client("s3", region_name="ap-southeast-1")
+    s3.create_bucket(
+        Bucket="test-jobs-bucket",
+        CreateBucketConfiguration={"LocationConstraint": "ap-southeast-1"},
+    )
+    ddb = boto3.resource("dynamodb", region_name="ap-southeast-1")
+    table = ddb.create_table(
+        TableName="test-jobs-table",
+        KeySchema=[{"AttributeName": "job_id", "KeyType": "HASH"}],
+        AttributeDefinitions=[{"AttributeName": "job_id", "AttributeType": "S"}],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    table.wait_until_exists()
+
+    from scraper.base_scraper import JobListing
+
+    fake_listing = JobListing(
+        job_id="js-job-001",
+        title="Solutions Architect",
+        company="Tech Corp",
+        description="Design systems",
+        url="https://sg.jobstreet.com/job/js-job-001",
+        source="jobstreet",
+    )
+
+    MockScraper = MagicMock()
+    mock_instance = MagicMock()
+    mock_instance.source = "jobstreet"
+    mock_instance.fetch.return_value = iter([fake_listing])
+    MockScraper.return_value = mock_instance
+
+    with patch.dict(
+        "infrastructure.handlers.scraper_handler.SCRAPERS",
+        {"jobstreet": MockScraper},
+    ):
+        from infrastructure.handlers import scraper_handler
+
+        result = scraper_handler.handler({"platform": "jobstreet"}, None)
+
+    assert result["new"] == 1
+    assert result["errors"] == 0
+    assert result["batch_id"].startswith("jobstreet-")
+    mock_instance.fetch.assert_called_once()
+
+
+def test_handler_raises_for_unknown_platform():
+    """An unrecognised platform key must raise ValueError — not silently default."""
+    with patch.dict(
+        "infrastructure.handlers.scraper_handler.SCRAPERS",
+        {"mcf": MagicMock(), "jobstreet": MagicMock()},
+    ):
+        from infrastructure.handlers import scraper_handler
+
+        with pytest.raises(ValueError, match="Unknown platform"):
+            scraper_handler.handler({"platform": "indeed"}, None)
+
