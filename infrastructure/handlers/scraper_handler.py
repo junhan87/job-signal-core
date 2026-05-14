@@ -16,11 +16,13 @@ import boto3
 from botocore.exceptions import ClientError
 
 from scraper.base_scraper import BaseScraper
+from scraper.jobstreet import JobStreetScraper
 from scraper.mycareersfuture import MyCareersFutureScraper
 
 # --- Scraper registry (add new scrapers here) ---
 SCRAPERS: dict[str, type[BaseScraper]] = {
     "mcf": MyCareersFutureScraper,
+    "jobstreet": JobStreetScraper,
 }
 
 logger = logging.getLogger(__name__)
